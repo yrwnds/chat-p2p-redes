@@ -28,8 +28,6 @@ public class UDPServiceImpl implements UDPService {
         Runtime.getRuntime().addShutdownHook(new Thread(this::EnviaFimChat));
     }
 
-    // implementar funçao q remove usuario dps de 30 seg sem sonda do usuario
-
     public class ChecaAtividade implements Runnable {
         @SneakyThrows
         @Override
@@ -37,14 +35,14 @@ public class UDPServiceImpl implements UDPService {
             while (true) {
                 Thread.sleep(1000);
 
-                System.out.println("Usuarios online: " + usuariosOnline);
-
                 Iterator<Usuario> iterator = usuariosOnline.iterator();
                 while (iterator.hasNext()) {
                     Usuario usuario = iterator.next();
-                    if(System.currentTimeMillis() - usuario.getLastseen() > 30000) {
-                        usuariosOnline.remove(usuario);
+                    if (System.currentTimeMillis() - usuario.getLastseen() > 30000) {
+                        iterator.remove();
                         usuarioListener.usuarioRemovido(usuario);
+
+                        System.out.println("[SERVER] Excluiu usuario " + usuario.getNome() + " por inatividade.");
                     }
                 }
             }
@@ -78,25 +76,30 @@ public class UDPServiceImpl implements UDPService {
 
                 if (msg.getTipoMensagem() == Mensagem.TipoMensagem.msg_grupo) {
                     System.out.println("[SERVER] Mensagem recebida no chat geral de: " + packet.getAddress().getHostAddress());
-
-                    mensagemListener.mensagemRecebida(msgRecebida, remetente, true);
+                    if (!packet.getAddress().equals(usuario.getEndereco())) {
+                        mensagemListener.mensagemRecebida(msgRecebida, remetente, true);
+                    }
 
                 } else if (msg.getTipoMensagem() == Mensagem.TipoMensagem.msg_individual) {
                     System.out.println("[SERVER] Mensagem recebida individual de: " + packet.getAddress().getHostAddress());
-
-                    mensagemListener.mensagemRecebida(msgRecebida, remetente, false);
+                    if (!packet.getAddress().equals(usuario.getEndereco())) {
+                        mensagemListener.mensagemRecebida(msgRecebida, remetente, false);
+                    }
 
                 } else if (msg.getTipoMensagem() == Mensagem.TipoMensagem.sonda) {
                     System.out.println("[SERVER] Sonda detectada de: " + packet.getAddress().getHostAddress());
 
-                    boolean jaexiste=false;
-                    for(int i = 0 ; i < usuariosOnline.size() ; i++) {
-                        if(usuariosOnline.get(i).getEndereco().equals(remetente.getEndereco())) {
+                    boolean jaexiste = false;
+                    for (int i = 0; i < usuariosOnline.size(); i++) {
+                        if (usuariosOnline.get(i).getEndereco().equals(remetente.getEndereco())) {
+
                             usuariosOnline.get(i).setLastseen(remetente.getLastseen());
-                            jaexiste=true;
+                            usuariosOnline.get(i).setStatus(remetente.getStatus());
+
+                            jaexiste = true;
                         }
                     }
-                    if (jaexiste==false){
+                    if (jaexiste == false) {
                         usuariosOnline.add(remetente);
                     }
 
@@ -137,7 +140,7 @@ public class UDPServiceImpl implements UDPService {
         @Override
         public void run() {
             while (true) {
-                Thread.sleep(5000);
+                Thread.sleep(1000);
                 if (usuario == null) {
                     continue;
                 }
