@@ -16,5 +16,5 @@ public class Mensagem {
 
     private String usuario;
     private String status;
-    private String mensagem;
+    private String msg;
 }

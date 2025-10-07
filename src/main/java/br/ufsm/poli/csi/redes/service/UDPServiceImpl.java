@@ -72,22 +72,22 @@ public class UDPServiceImpl implements UDPService {
                 remetente.setStatus(Usuario.StatusUsuario.valueOf(msg.getStatus()));
                 remetente.setLastseen(System.currentTimeMillis());
 
-                String msgRecebida = msg.getMensagem();
+                String msgRecebida = msg.getMsg();
 
                 if (msg.getTipoMensagem() == Mensagem.TipoMensagem.msg_grupo) {
-                    System.out.println("[SERVER] Mensagem recebida no chat geral de: " + packet.getAddress().getHostAddress());
+                    System.out.println("[SERVER] Mensagem recebida no chat geral de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
                     if (!packet.getAddress().equals(usuario.getEndereco())) {
                         mensagemListener.mensagemRecebida(msgRecebida, remetente, true);
                     }
 
                 } else if (msg.getTipoMensagem() == Mensagem.TipoMensagem.msg_individual) {
-                    System.out.println("[SERVER] Mensagem recebida individual de: " + packet.getAddress().getHostAddress());
+                    System.out.println("[SERVER] Mensagem recebida individual de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
                     if (!packet.getAddress().equals(usuario.getEndereco())) {
                         mensagemListener.mensagemRecebida(msgRecebida, remetente, false);
                     }
 
                 } else if (msg.getTipoMensagem() == Mensagem.TipoMensagem.sonda) {
-                    System.out.println("[SERVER] Sonda detectada de: " + packet.getAddress().getHostAddress());
+                    System.out.println("[SERVER] Sonda detectada de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
 
                     boolean jaexiste = false;
                     for (int i = 0; i < usuariosOnline.size(); i++) {
@@ -95,6 +95,8 @@ public class UDPServiceImpl implements UDPService {
 
                             usuariosOnline.get(i).setLastseen(remetente.getLastseen());
                             usuariosOnline.get(i).setStatus(remetente.getStatus());
+
+                            usuarioListener.usuarioAlterado(remetente);
 
                             jaexiste = true;
                         }
@@ -105,11 +107,14 @@ public class UDPServiceImpl implements UDPService {
 
                     usuarioListener.usuarioAdicionado(remetente);
 
-                } else {
-                    System.out.println("[SERVER] fim_chat detectado de: " + packet.getAddress().getHostAddress());
+                } else if (msg.getTipoMensagem() == Mensagem.TipoMensagem.fim_chat) {
+                    System.out.println("[SERVER] fim_chat detectado de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
 
                     usuarioListener.usuarioRemovido(remetente);
 
+                } else{
+                    System.out.println("ERRO DE MENSAGEM de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
+                    System.out.println("\n" + strMsg);
                 }
             }
         }
@@ -122,17 +127,18 @@ public class UDPServiceImpl implements UDPService {
 
         mensagem.setUsuario(usuario.getNome());
         mensagem.setStatus(usuario.getStatus().toString());
-        mensagem.setMensagem("Chat encerrado com este usuario porque o mesmo foi desconectado.");
+        mensagem.setMsg("Chat encerrado com este usuario porque o mesmo foi desconectado.");
 
-        ObjectMapper mapper = new ObjectMapper();
-        String strMensagem = mapper.writeValueAsString(mensagem);
-        byte[] bMensagem = strMensagem.getBytes();
+        for (int i = 0 ; i < 255 ; i ++){
+            ObjectMapper mapper = new ObjectMapper();
+            String strMensagem = mapper.writeValueAsString(mensagem);
+            byte[] bMensagem = strMensagem.getBytes();
 
-        DatagramPacket packet = new DatagramPacket(bMensagem, bMensagem.length, InetAddress.getByName("255.255.255.255"), 8080);
-
+            DatagramPacket packet = new DatagramPacket(bMensagem, bMensagem.length, InetAddress.getByName("192.168.100." + i), 8080);
+            DatagramSocket socket = new DatagramSocket();
+            socket.send(packet);
+        }
         System.out.println("[CLIENT] Chat encerrado.");
-        DatagramSocket socket = new DatagramSocket();
-        socket.send(packet);
     }
 
     private class EnviaSonda implements Runnable {
@@ -140,7 +146,7 @@ public class UDPServiceImpl implements UDPService {
         @Override
         public void run() {
             while (true) {
-                Thread.sleep(1000);
+                Thread.sleep(5000);
                 if (usuario == null) {
                     continue;
                 }
@@ -181,28 +187,33 @@ public class UDPServiceImpl implements UDPService {
         DatagramSocket socket = new DatagramSocket();
 
         Mensagem newMsg = new Mensagem();
-        newMsg.setMensagem(mensagem);
+        newMsg.setMsg(mensagem);
         newMsg.setUsuario(usuario.getNome());
         newMsg.setStatus(usuario.getStatus().toString());
 
         InetAddress address;
 
-        if (chatGeral) {
-            newMsg.setTipoMensagem(Mensagem.TipoMensagem.msg_grupo);
-            address = InetAddress.getByName("255.255.255.255");
-        } else {
-            newMsg.setTipoMensagem(Mensagem.TipoMensagem.msg_individual);
-            address = destinatario.getEndereco();
-        }
-
         ObjectMapper mapper = new ObjectMapper();
 
-        String strMsg = mapper.writeValueAsString(newMsg);
+        if (chatGeral) {
+            newMsg.setTipoMensagem(Mensagem.TipoMensagem.msg_grupo);
+            String strMsg = mapper.writeValueAsString(newMsg);
+            byte[] bMsg = strMsg.getBytes();
+            for(int i = 0 ; i < 255 ; i ++){
+                address = InetAddress.getByName("192.168.100." + i);
 
-        byte[] bMsg = strMsg.getBytes();
+                DatagramPacket packet = new DatagramPacket(bMsg, bMsg.length, address, 8080);
+                socket.send(packet);
+            }
+        } else {
+            newMsg.setTipoMensagem(Mensagem.TipoMensagem.msg_individual);
+            String strMsg = mapper.writeValueAsString(newMsg);
+            byte[] bMsg = strMsg.getBytes();
+            address = destinatario.getEndereco();
 
-        DatagramPacket packet = new DatagramPacket(bMsg, bMsg.length, address, 8080);
-        socket.send(packet);
+            DatagramPacket packet = new DatagramPacket(bMsg, bMsg.length, address, 8080);
+            socket.send(packet);
+        }
     }
 
 
