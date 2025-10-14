@@ -12,4 +12,5 @@ public interface UDPServiceMensagemListener {
      */
     void mensagemRecebida(String mensagem, Usuario remetente, boolean chatGeral);
 
+    void fimChatPelaOutraParte(Usuario remetente);
 }

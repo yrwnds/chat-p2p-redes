@@ -6,20 +6,24 @@ import br.ufsm.poli.csi.redes.service.UDPServiceImpl;
 import br.ufsm.poli.csi.redes.service.UDPServiceMensagemListener;
 import br.ufsm.poli.csi.redes.service.UDPServiceUsuarioListener;
 import lombok.Getter;
+
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * 
+ *
  * User: Rafael
  * Date: 13/10/14
  * Time: 10:28
- * 
+ *
  */
 public class ChatClientSwing extends JFrame {
 
@@ -85,9 +89,10 @@ public class ChatClientSwing extends JFrame {
                     item.addActionListener(new ActionListener() {
                         @Override
                         public void actionPerformed(ActionEvent e) {
-                            PainelChatPVT painel = (PainelChatPVT) tabbedPane.getTabComponentAt(tab);
+                            PainelChatPVT painel = (PainelChatPVT) tabbedPane.getComponentAt(tab);
                             tabbedPane.remove(tab);
                             chatsAbertos.remove(painel.getUsuario());
+                            udpService.fimChat(painel.getUsuario());
                         }
                     });
                     popupMenu.add(item);
@@ -203,6 +208,25 @@ public class ChatClientSwing extends JFrame {
             }
             if (painel != null) {
                 painel.getAreaChat().append(remetente.getNome() + "> " + mensagem + "\n");
+            } else {
+                if (chatsAbertos.add(remetente)) {
+                    PainelChatPVT painelChatPVT = new PainelChatPVT(remetente, false);
+                    tabbedPane.add(remetente.toString(), painelChatPVT);
+                    painelChatPVT.getAreaChat().append(remetente.getNome() + "> " + mensagem + "\n");
+                }
+            }
+        }
+
+        @Override
+        public void fimChatPelaOutraParte(Usuario remetente) {
+            PainelChatPVT painel = null;
+            for (int i = 1; i < tabbedPane.getTabCount(); i++) {
+                PainelChatPVT p = (PainelChatPVT) tabbedPane.getComponentAt(i);
+                if (p.getUsuario().equals(remetente)) {
+                    tabbedPane.remove(p);
+                    chatsAbertos.remove(p.getUsuario());
+                    break;
+                }
             }
         }
     }

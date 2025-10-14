@@ -30,5 +30,7 @@ public interface UDPService {
      */
     void addListenerUsuario(UDPServiceUsuarioListener listener);
 
+    void fimChat(Usuario usuario);
+
 
 }

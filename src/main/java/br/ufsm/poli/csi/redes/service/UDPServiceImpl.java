@@ -25,7 +25,7 @@ public class UDPServiceImpl implements UDPService {
         new Thread(new Server()).start();
         new Thread(new EnviaSonda()).start();
         new Thread(new ChecaAtividade()).start();
-        Runtime.getRuntime().addShutdownHook(new Thread(this::EnviaFimChat));
+//        Runtime.getRuntime().addShutdownHook(new Thread(this::fimChat));
     }
 
     public class ChecaAtividade implements Runnable {
@@ -33,7 +33,7 @@ public class UDPServiceImpl implements UDPService {
         @Override
         public void run() {
             while (true) {
-                Thread.sleep(1000);
+                Thread.sleep(10000);
 
                 System.out.println("Checando atividade.");
 
@@ -145,7 +145,8 @@ public class UDPServiceImpl implements UDPService {
     }
 
     @SneakyThrows
-    private void EnviaFimChat() {
+    @Override
+    public void fimChat(Usuario usuario) {
         Mensagem mensagem = new Mensagem();
         mensagem.setTipoMensagem(Mensagem.TipoMensagem.fim_chat);
 
@@ -158,7 +159,7 @@ public class UDPServiceImpl implements UDPService {
             String strMensagem = mapper.writeValueAsString(mensagem);
             byte[] bMensagem = strMensagem.getBytes();
 
-            DatagramPacket packet = new DatagramPacket(bMensagem, bMensagem.length, InetAddress.getByName("192.168.100." + i), 8080);
+            DatagramPacket packet = new DatagramPacket(bMensagem, bMensagem.length, InetAddress.getByName("192.168.83." + i), 8080);
             DatagramSocket socket = new DatagramSocket();
             socket.send(packet);
         }
