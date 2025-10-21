@@ -25,7 +25,6 @@ public class UDPServiceImpl implements UDPService {
         new Thread(new Server()).start();
         new Thread(new EnviaSonda()).start();
         new Thread(new ChecaAtividade()).start();
-//        Runtime.getRuntime().addShutdownHook(new Thread(this::fimChat));
     }
 
     public class ChecaAtividade implements Runnable {
@@ -35,12 +34,11 @@ public class UDPServiceImpl implements UDPService {
             while (true) {
                 Thread.sleep(10000);
 
-                System.out.println("Checando atividade.");
-
                 Iterator<Usuario> iterator = usuariosOnline.iterator();
                 while (iterator.hasNext()) {
                     Usuario usuario = iterator.next();
                     if (System.currentTimeMillis() - usuario.getLastseen() > 30000) {
+                        System.out.println("Usuario inativo: " + usuario.getNome() + ", " + usuario.getEndereco());
                         iterator.remove();
                         usuarioListener.usuarioRemovido(usuario);
 
@@ -76,9 +74,14 @@ public class UDPServiceImpl implements UDPService {
 
                     Usuario remetente = null;
                     boolean existe = false;
-                    for(int i = 0 ; i < usuariosOnline.size() ; i ++ ) {
-                        if(usuariosOnline.get(i).getEndereco().equals(packet.getAddress().getHostAddress())){
-                            remetente = usuariosOnline.get(i);
+                    for (Usuario usu : usuariosOnline) {
+                        if (usu.getEndereco().equals(packet.getAddress())) {
+                            remetente = usu;
+                            if(!usu.getStatus().equals(Usuario.StatusUsuario.valueOf(msg.getStatus()))){
+                                usuarioListener.usuarioAlterado(usu);
+                                remetente.setStatus(Usuario.StatusUsuario.valueOf(msg.getStatus()));
+                            }
+                            remetente.setLastseen(System.currentTimeMillis());
                             existe = true;
                         }
                     }
@@ -89,6 +92,7 @@ public class UDPServiceImpl implements UDPService {
                         remetente.setStatus(Usuario.StatusUsuario.valueOf(msg.getStatus()));
                         remetente.setLastseen(System.currentTimeMillis());
                         usuariosOnline.add(remetente);
+                        usuarioListener.usuarioAdicionado(remetente);
                     }
 
 
@@ -107,30 +111,19 @@ public class UDPServiceImpl implements UDPService {
                         }
 
                     } else if (msg.getTipoMensagem() == Mensagem.TipoMensagem.sonda) {
-                        System.out.println("[SERVER] Sonda detectada de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
+                        System.out.println("[SERVER] Sonda detectada de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + remetente.getStatus() + ")");
 
-                        boolean jaexiste = false;
-                        for (int i = 0; i < usuariosOnline.size(); i++) {
-                            if (usuariosOnline.get(i).getEndereco().equals(remetente.getEndereco())) {
+                        for (Usuario usu : usuariosOnline) {
+                            if (usu.getEndereco().equals(remetente.getEndereco())) {
 
-                                usuariosOnline.get(i).setLastseen(remetente.getLastseen());
-                                usuariosOnline.get(i).setStatus(remetente.getStatus());
+                                usu.setLastseen(remetente.getLastseen());
 
-                                usuarioListener.usuarioAlterado(remetente);
-
-                                jaexiste = true;
                             }
                         }
-                        if (jaexiste == false) {
-                            usuariosOnline.add(remetente);
-                        }
+                    }else if(msg.getTipoMensagem() == Mensagem.TipoMensagem.fim_chat){
 
-                        usuarioListener.usuarioAdicionado(remetente);
-
-                    } else if (msg.getTipoMensagem() == Mensagem.TipoMensagem.fim_chat) {
-                        System.out.println("[SERVER] fim_chat detectado de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
-
-                        usuarioListener.usuarioRemovido(remetente);
+                        System.out.println("fim_chat recebido de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
+                        mensagemListener.fimChatPelaOutraParte(remetente);
 
                     } else{
                         System.out.println("ERRO DE MENSAGEM de: " + packet.getAddress().getHostAddress() + " (" + remetente.getNome() + ")");
@@ -152,17 +145,15 @@ public class UDPServiceImpl implements UDPService {
 
         mensagem.setUsuario(usuario.getNome());
         mensagem.setStatus(usuario.getStatus().toString());
-        mensagem.setMsg("Chat encerrado com este usuario porque o mesmo foi desconectado.");
 
-        for (int i = 0 ; i < 255 ; i ++){
-            ObjectMapper mapper = new ObjectMapper();
-            String strMensagem = mapper.writeValueAsString(mensagem);
-            byte[] bMensagem = strMensagem.getBytes();
+        ObjectMapper mapper = new ObjectMapper();
+        String strMensagem = mapper.writeValueAsString(mensagem);
+        byte[] bMensagem = strMensagem.getBytes();
 
-            DatagramPacket packet = new DatagramPacket(bMensagem, bMensagem.length, InetAddress.getByName("192.168.83." + i), 8080);
-            DatagramSocket socket = new DatagramSocket();
-            socket.send(packet);
-        }
+        DatagramPacket packet = new DatagramPacket(bMensagem, bMensagem.length, InetAddress.getByAddress(usuario.getEndereco().getAddress()), 8080);
+        DatagramSocket socket = new DatagramSocket();
+        socket.send(packet);
+
         System.out.println("[CLIENT] Chat encerrado.");
     }
 
